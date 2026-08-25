@@ -1,11 +1,9 @@
 package com.Exp1_S2.Accesibilidad.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.Exp1_S2.Accesibilidad.ui.theme.AccesibilidadTheme
 import org.junit.Rule
@@ -18,30 +16,27 @@ class AccesibilidadAppTest {
     val composeTestRule = createComposeRule()
 
     @Test
-    fun appRoot_displaysRegistrationFormAndEmptyState() {
+    fun appRoot_displaysLoginScreen() {
         composeTestRule.setContent {
             AccesibilidadTheme {
                 AccesibilidadApp()
             }
         }
 
-        composeTestRule.onNodeWithText("Registro accesible").assertIsDisplayed()
-        composeTestRule.onNodeWithText(
-            "Todavía no hay cuentas registradas. Completá el formulario para agregar la primera."
-        ).assertExists()
+        composeTestRule.onNodeWithText("Crear una cuenta").assertIsDisplayed()
     }
 
     @Test
-    fun registration_showsValidationMessageWhenRequiredFieldsAreBlank() {
+    fun login_navigatesToRegistration() {
         composeTestRule.setContent {
             AccesibilidadTheme {
                 AccesibilidadApp()
             }
         }
 
-        composeTestRule.onNodeWithText("Registrar cuenta").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("Crear una cuenta").performClick()
 
-        composeTestRule.onNodeWithText("Completá todos los campos obligatorios.")
+        composeTestRule.onNodeWithText("Registro accesible")
             .assertIsDisplayed()
     }
 }

@@ -9,6 +9,9 @@ data class User(
     val accessibilityPreferences: Set<AccessibilityPreference>
 )
 
+fun authenticateUser(users: Array<User?>, email: String, password: String): Boolean =
+    users.any { user -> user?.email == email && user?.password == password }
+
 enum class CommunicationPreference {
     EMAIL,
     PHONE,

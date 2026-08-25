@@ -43,6 +43,7 @@ import com.Exp1_S2.Accesibilidad.User
 fun RegistrationScreen(
     users: List<User>,
     onRegister: (User) -> Boolean,
+    onRegistrationSuccess: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var name by remember { mutableStateOf("") }
@@ -208,6 +209,9 @@ fun RegistrationScreen(
                         "Cuenta registrada correctamente."
                     } else {
                         "No se pueden registrar más cuentas: se alcanzó el límite de cinco."
+                    }
+                    if (registered) {
+                        onRegistrationSuccess()
                     }
                 }
             },
