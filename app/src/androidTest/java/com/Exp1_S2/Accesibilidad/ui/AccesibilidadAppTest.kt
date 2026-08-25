@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.Exp1_S2.Accesibilidad.ui.home.CommunicationHomeScreen
 import com.Exp1_S2.Accesibilidad.ui.theme.AccesibilidadTheme
 import org.junit.Rule
 import org.junit.Test
@@ -38,5 +39,19 @@ class AccesibilidadAppTest {
 
         composeTestRule.onNodeWithText("Registro accesible")
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun communicationHome_displaysSelectedQuickPhrase() {
+        composeTestRule.setContent {
+            AccesibilidadTheme {
+                CommunicationHomeScreen(userName = "Ana", onLogout = {})
+            }
+        }
+
+        composeTestRule.onNodeWithText("Frases rápidas").performClick()
+        composeTestRule.onNodeWithText("Necesito ayuda, por favor.").performClick()
+
+        composeTestRule.onNodeWithText("Mensaje para comunicar").assertIsDisplayed()
     }
 }
