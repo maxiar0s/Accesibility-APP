@@ -78,5 +78,5 @@ Open the project in Android Studio and run the `app` configuration to install th
 
 - Keep source, Gradle wrapper/configuration, tests, and `docs/` in the delivery ZIP.
 - Exclude generated/local material such as `.git/`, `.gradle/`, `build/`, `app/build/`, `.idea/`, and `local.properties`.
-- Create and push a remote Git repository before submission. The student must supply the repository URL and capture their own Git-history evidence; this documentation does not invent either.
-- Capture the required application screenshots from a real emulator/device state. See [`docs/technical-report.md`](docs/technical-report.md) and [`docs/submission-checklist.md`](docs/submission-checklist.md).
+- Repository: [Accesibility-APP](https://github.com/maxiar0s/Accesibility-APP).
+- The final report and delivery checklist are in [`docs/Exp1_S2/S2_ Formato de respuesta_A_Actividad_2.docx`](docs/Exp1_S2/S2_%20Formato%20de%20respuesta_A_Actividad_2.docx). Export the DOCX to PDF with Microsoft Word or LibreOffice before submission.

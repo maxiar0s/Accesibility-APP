@@ -126,7 +126,7 @@ fun CommunicationHomeScreen(
                                     "Aviso visual urgente desactivado."
                                 }
                             })
-                            else -> ({ feedback = "La configuración estará disponible en una próxima versión." })
+                            else -> ({ feedback = "Acción no disponible." })
                         }
                     )
                 }
@@ -220,8 +220,7 @@ fun CommunicationHomeScreen(
 private val homeActions = listOf(
     "Escribir mensaje",
     "Frases rápidas",
-    "Aviso visual",
-    "Configuración"
+    "Aviso visual"
 )
 
 @Composable
