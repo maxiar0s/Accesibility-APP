@@ -16,13 +16,18 @@ import com.Exp1_S2.Accesibilidad.auth.AuthRoute
 import com.Exp1_S2.Accesibilidad.auth.AuthSession
 import com.Exp1_S2.Accesibilidad.auth.AuthSessionViewModel
 import com.Exp1_S2.Accesibilidad.phrases.PersonalPhrases
+import com.Exp1_S2.Accesibilidad.speech.SpeechController
 import com.Exp1_S2.Accesibilidad.ui.home.CommunicationHomeScreen
 import com.Exp1_S2.Accesibilidad.ui.login.LoginScreen
 import com.Exp1_S2.Accesibilidad.ui.recovery.PasswordRecoveryScreen
 import com.Exp1_S2.Accesibilidad.ui.registration.RegistrationScreen
 
 @Composable
-fun AccesibilidadApp(session: AuthSession? = null, phrases: PersonalPhrases? = null) {
+fun AccesibilidadApp(
+    session: AuthSession? = null,
+    phrases: PersonalPhrases? = null,
+    speechFactory: (() -> SpeechController)? = null
+) {
     val owner = if (session == null) viewModel<AuthSessionViewModel>() else null
     val controller = session ?: requireNotNull(owner).session
     val phraseController = phrases ?: requireNotNull(owner) { "Inject phrases with a fake session." }.phrases
@@ -67,7 +72,7 @@ fun AccesibilidadApp(session: AuthSession? = null, phrases: PersonalPhrases? = n
                 key(user.uid) {
                     CommunicationHomeScreen(
                         userName = user.name, onLogout = controller::logout,
-                        phrases = phraseController, user = user
+                        phrases = phraseController, user = user, speechFactory = speechFactory
                     )
                 }
             }

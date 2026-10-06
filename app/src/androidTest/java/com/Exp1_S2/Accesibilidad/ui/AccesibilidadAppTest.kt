@@ -14,6 +14,8 @@ import com.Exp1_S2.Accesibilidad.ui.home.CommunicationHomeScreen
 import com.Exp1_S2.Accesibilidad.ui.theme.AccesibilidadTheme
 import com.Exp1_S2.Accesibilidad.auth.*
 import com.Exp1_S2.Accesibilidad.phrases.*
+import com.Exp1_S2.Accesibilidad.speech.*
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,7 +31,7 @@ class AccesibilidadAppTest {
         val phrases = fakePhrases()
         composeTestRule.setContent {
             AccesibilidadTheme {
-                AccesibilidadApp(session, phrases)
+                AccesibilidadApp(session, phrases, ::fakeSpeech)
             }
         }
 
@@ -42,7 +44,7 @@ class AccesibilidadAppTest {
         val phrases = fakePhrases()
         composeTestRule.setContent {
             AccesibilidadTheme {
-                AccesibilidadApp(session, phrases)
+                AccesibilidadApp(session, phrases, ::fakeSpeech)
             }
         }
 
@@ -56,7 +58,7 @@ class AccesibilidadAppTest {
     fun communicationHome_displaysSelectedQuickPhrase() {
         composeTestRule.setContent {
             AccesibilidadTheme {
-                CommunicationHomeScreen(userName = "Ana", onLogout = {})
+                CommunicationHomeScreen(userName = "Ana", onLogout = {}, speechFactory = ::fakeSpeech)
             }
         }
 
@@ -71,7 +73,7 @@ class AccesibilidadAppTest {
         val auth = FakeAuth()
         val session = fakeSession(auth)
         val phrases = fakePhrases()
-        composeTestRule.setContent { AccesibilidadTheme { AccesibilidadApp(session, phrases) } }
+        composeTestRule.setContent { AccesibilidadTheme { AccesibilidadApp(session, phrases, ::fakeSpeech) } }
         composeTestRule.onNodeWithText("Correo electrónico").performTextInput("ana@example.com")
         composeTestRule.onNodeWithText("Contraseña").performTextInput("secret")
         composeTestRule.onNode(hasText("Iniciar sesión") and hasClickAction()).performClick()
@@ -94,7 +96,7 @@ class AccesibilidadAppTest {
         val auth = FakeAuth()
         val session = fakeSession(auth)
         val phrases = fakePhrases()
-        composeTestRule.setContent { AccesibilidadTheme { AccesibilidadApp(session, phrases) } }
+        composeTestRule.setContent { AccesibilidadTheme { AccesibilidadApp(session, phrases, ::fakeSpeech) } }
         composeTestRule.onNodeWithText("Crear una cuenta").performClick()
         composeTestRule.onNodeWithText("Nombre completo").performTextInput("Ana")
         composeTestRule.onNodeWithText("Correo electrónico").performTextInput("ana@example.com")
@@ -114,7 +116,7 @@ class AccesibilidadAppTest {
     fun personalPhrases_createSelectEditAndConfirmDelete() {
         val phrases = fakePhrases().apply { bind("uid") }
         composeTestRule.setContent {
-            AccesibilidadTheme { CommunicationHomeScreen("Ana", {}, phrases = phrases) }
+            AccesibilidadTheme { CommunicationHomeScreen("Ana", {}, phrases = phrases, speechFactory = ::fakeSpeech) }
         }
         composeTestRule.onNodeWithText("Texto de la frase personal").performScrollTo().performTextInput("Hello")
         composeTestRule.onNodeWithText("Añadir frase").performScrollTo().performClick()
@@ -126,6 +128,38 @@ class AccesibilidadAppTest {
         composeTestRule.onNodeWithText("Eliminar frase: Changed").performScrollTo().performClick()
         composeTestRule.onNodeWithText("Confirmar eliminación").performClick()
         composeTestRule.onNodeWithText("Todavía no hay frases personales.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun selectedMessage_isReadOnlyOnClickAndCanBeStopped() {
+        val engine = FakeSpeechEngine()
+        val speech = SpeechController(engine)
+        composeTestRule.setContent {
+            AccesibilidadTheme { CommunicationHomeScreen("Ana", {}, speechFactory = { speech }) }
+        }
+        composeTestRule.onNodeWithText("Frases rápidas").performClick()
+        composeTestRule.onNodeWithText("Necesito ayuda, por favor.").performScrollTo().performClick()
+        composeTestRule.runOnIdle { assertEquals(null, engine.text) }
+        composeTestRule.onNodeWithText("Leer en voz alta").performScrollTo().performClick()
+        composeTestRule.runOnIdle { assertEquals("Necesito ayuda, por favor.", engine.text) }
+        composeTestRule.onNodeWithText("Leer en voz alta").assertIsNotEnabled()
+        composeTestRule.onNodeWithText("Detener voz").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("Detener voz").assertIsNotEnabled()
+        composeTestRule.runOnIdle { assertEquals(1, engine.stops) }
+    }
+
+    private fun fakeSpeech() = SpeechController(FakeSpeechEngine())
+
+    private class FakeSpeechEngine : SpeechEngine {
+        var text: String? = null
+        var stops = 0
+        override fun initialize(ready: (Boolean) -> Unit, progress: (String, SpeechState) -> Unit) = ready(true)
+        override fun speak(text: String, utteranceId: String): Boolean {
+            this.text = text
+            return true
+        }
+        override fun stop() { stops++ }
+        override fun shutdown() = Unit
     }
 
     private fun fakePhrases(): PersonalPhrases = PersonalPhrases(object : PhraseGateway {

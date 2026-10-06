@@ -65,6 +65,14 @@ Estas reglas se comparten entre formulario y controlador y se aplican **solo en 
 
 Para actualizar en el teléfono, instala desde Android Studio la configuración `app` sobre la aplicación existente con el mismo identificador y firma, sin desinstalar ni borrar sus datos. Si Android informa una firma incompatible, no borres la aplicación: utiliza la misma configuración de firma que la instalación anterior. Este cambio no elimina cuentas ni transforma frases guardadas; la instalación en un dispositivo queda fuera de esta comprobación local.
 
+### Lectura en voz alta
+
+Al mostrar un mensaje escrito, una frase rápida o una frase personal, **Leer en voz alta** reproduce exactamente ese texto en español. Seleccionar o enviar un mensaje no inicia audio automáticamente. **Detener voz** cancela la lectura; cambiar el mensaje, salir de Home o cambiar de cuenta también detiene la voz y libera el motor cuando corresponde.
+
+Se necesita un motor Android TextToSpeech con datos de español disponibles. La pantalla informa la preparación, la lectura, los errores y la falta de voz española; no sustituye silenciosamente el idioma. Si no está disponible, revisa la configuración de texto a voz del dispositivo. No se añade reconocimiento de voz ni permiso de micrófono.
+
+Las pruebas locales usan un motor falso; compilar el adaptador comprueba las API del SDK, pero no demuestra audio audible, disponibilidad de español ni funcionamiento en un dispositivo. La generación de un APK firmado sigue pendiente: consulta la [guía de firma](docs/signing-apk.md).
+
 ## Technology stack
 
 - Kotlin and Jetpack Compose with Material 3

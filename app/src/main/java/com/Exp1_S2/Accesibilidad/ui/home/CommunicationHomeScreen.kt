@@ -36,6 +36,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.Exp1_S2.Accesibilidad.User
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
+import com.Exp1_S2.Accesibilidad.speech.AndroidSpeechEngine
+import com.Exp1_S2.Accesibilidad.speech.SpeechController
+import com.Exp1_S2.Accesibilidad.speech.SpeechState
 import com.Exp1_S2.Accesibilidad.ui.registration.UserSummary
 
 private val quickPhrases = listOf(
@@ -51,8 +56,19 @@ fun CommunicationHomeScreen(
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
     phrases: com.Exp1_S2.Accesibilidad.phrases.PersonalPhrases? = null,
-    user: User? = null
+    user: User? = null,
+    speechFactory: (() -> SpeechController)? = null
 ) {
+    val context = LocalContext.current.applicationContext
+    val speech = remember(user?.uid, speechFactory) {
+        speechFactory?.invoke() ?: SpeechController(AndroidSpeechEngine(context))
+    }
+    var speechState by remember(speech) { mutableStateOf(speech.state) }
+    DisposableEffect(speech) {
+        speech.onChange = { speechState = it }
+        speechState = speech.state
+        onDispose { speech.close() }
+    }
     var profileExpanded by remember(user?.uid) { mutableStateOf(false) }
     var messageDraft by remember { mutableStateOf("") }
     var displayedMessage by remember { mutableStateOf<String?>(null) }
@@ -61,6 +77,11 @@ fun CommunicationHomeScreen(
     var visualNoticeEnabled by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
     val focusRequester = remember { FocusRequester() }
+
+    fun display(message: String) {
+        if (message != displayedMessage) speech.stop()
+        displayedMessage = message
+    }
 
     LaunchedEffect(showMessageEditor) {
         if (showMessageEditor) focusRequester.requestFocus()
@@ -160,7 +181,7 @@ fun CommunicationHomeScreen(
                         if (messageDraft.isBlank()) {
                             feedback = "Escribe un mensaje antes de enviarlo."
                         } else {
-                            displayedMessage = messageDraft.trim()
+                            display(messageDraft.trim())
                             messageDraft = ""
                             feedback = "Mensaje preparado para comunicar."
                         }
@@ -177,7 +198,7 @@ fun CommunicationHomeScreen(
                     quickPhrases.forEach { phrase ->
                         Button(
                             onClick = {
-                                displayedMessage = phrase
+                                display(phrase)
                                 feedback = "Frase rápida seleccionada."
                             },
                             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
@@ -189,7 +210,7 @@ fun CommunicationHomeScreen(
             }
 
             phrases?.let { controller ->
-                PersonalPhrasesSection(controller) { displayedMessage = it }
+                PersonalPhrasesSection(controller) { display(it) }
             }
 
             if (visualNoticeEnabled) {
@@ -219,9 +240,24 @@ fun CommunicationHomeScreen(
                     Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Mensaje para comunicar", style = MaterialTheme.typography.titleMedium)
                         Text(message, style = MaterialTheme.typography.headlineSmall)
+                        Button(
+                            onClick = { speech.speak(message) },
+                            enabled = speechState == SpeechState.READY || speechState == SpeechState.ERROR,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                        ) { Text("Leer en voz alta") }
+                        Button(
+                            onClick = speech::stop,
+                            enabled = speechState == SpeechState.SPEAKING,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                        ) { Text("Detener voz") }
                     }
                 }
             }
+
+            Text(
+                speechState.message,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+            )
 
             feedback?.let { message ->
                 Text(

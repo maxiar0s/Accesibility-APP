@@ -16,3 +16,6 @@ local.properties
 odd
 .atl
 .codegraph
+*.jks
+*.keystore
+keystore.properties
