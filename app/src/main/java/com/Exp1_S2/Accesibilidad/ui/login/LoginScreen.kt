@@ -3,7 +3,10 @@ package com.Exp1_S2.Accesibilidad.ui.login
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.heading
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -27,22 +30,23 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun LoginScreen(
-    onLogin: (email: String, password: String) -> Boolean,
+    onLogin: (email: String, password: String) -> Unit,
+    busy: Boolean,
+    message: String?,
     onNavigateToRegistration: () -> Unit,
     onNavigateToRecovery: () -> Unit,
-    onLoginSuccess: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     Column(
-        modifier = modifier.padding(24.dp),
+        modifier = modifier.verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Iniciar sesión", style = MaterialTheme.typography.headlineMedium)
+        Text("Iniciar sesión", style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.semantics { heading() })
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -73,7 +77,7 @@ fun LoginScreen(
                 }
             }
         )
-        errorMessage?.let { message ->
+        message?.let { message ->
             Text(
                 text = message,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
@@ -83,21 +87,17 @@ fun LoginScreen(
         }
         Button(
             onClick = {
-                if (onLogin(email.trim(), password)) {
-                    errorMessage = null
-                    onLoginSuccess()
-                } else {
-                    errorMessage = "El correo electrónico o la contraseña no son correctos."
-                }
+                onLogin(email.trim(), password)
             },
-            modifier = Modifier.fillMaxWidth().height(56.dp)
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
         ) {
-            Text("Iniciar sesión")
+            Text(if (busy) "Iniciando sesión…" else "Iniciar sesión")
         }
-        TextButton(onClick = onNavigateToRegistration, modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = onNavigateToRegistration, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
             Text("Crear una cuenta")
         }
-        TextButton(onClick = onNavigateToRecovery, modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = onNavigateToRecovery, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
             Text("Recuperar contraseña")
         }
     }

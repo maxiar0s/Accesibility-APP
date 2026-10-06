@@ -5,12 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -33,10 +29,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
+import com.Exp1_S2.Accesibilidad.User
+import com.Exp1_S2.Accesibilidad.ui.registration.UserSummary
 
 private val quickPhrases = listOf(
     "Necesito ayuda, por favor.",
@@ -49,8 +49,11 @@ private val quickPhrases = listOf(
 fun CommunicationHomeScreen(
     userName: String?,
     onLogout: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    phrases: com.Exp1_S2.Accesibilidad.phrases.PersonalPhrases? = null,
+    user: User? = null
 ) {
+    var profileExpanded by remember(user?.uid) { mutableStateOf(false) }
     var messageDraft by remember { mutableStateOf("") }
     var displayedMessage by remember { mutableStateOf<String?>(null) }
     var showMessageEditor by remember { mutableStateOf(false) }
@@ -89,31 +92,41 @@ fun CommunicationHomeScreen(
                 modifier = Modifier.semantics { heading() },
                 style = MaterialTheme.typography.headlineMedium
             )
+            user?.let { currentUser ->
+                TextButton(
+                    onClick = { profileExpanded = !profileExpanded },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics {
+                        stateDescription = if (profileExpanded) "Expandido" else "Contraído"
+                    }
+                ) {
+                    Text(if (profileExpanded) "Ocultar perfil" else "Mostrar perfil")
+                }
+                if (profileExpanded) {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) { UserSummary(currentUser) }
+                    }
+                }
+            }
             Text(
-                text = "Elegí una forma de expresar lo que necesitás.",
+                text = "Elige una forma de expresar lo que necesitas.",
                 style = MaterialTheme.typography.bodyLarge
             )
 
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                modifier = Modifier.height(300.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(homeActions) { action ->
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                homeActions.forEach { action ->
                     HomeActionCard(
                         label = action,
                         onClick = when (action) {
                             "Escribir mensaje" -> ({
                                 showMessageEditor = true
                                 showQuickPhrases = false
-                                feedback = "Escribí tu mensaje y luego seleccioná Enviar."
+                                feedback = "Escribe tu mensaje y luego selecciona Enviar mensaje."
                             })
                             "Frases rápidas" -> ({
                                 showQuickPhrases = !showQuickPhrases
                                 showMessageEditor = false
                                 feedback = if (showQuickPhrases) {
-                                    "Elegí una frase rápida para mostrarla."
+                                    "Elige una frase rápida para mostrarla."
                                 } else {
                                     "Frases rápidas ocultas."
                                 }
@@ -145,7 +158,7 @@ fun CommunicationHomeScreen(
                 Button(
                     onClick = {
                         if (messageDraft.isBlank()) {
-                            feedback = "Escribí un mensaje antes de enviarlo."
+                            feedback = "Escribe un mensaje antes de enviarlo."
                         } else {
                             displayedMessage = messageDraft.trim()
                             messageDraft = ""
@@ -173,6 +186,10 @@ fun CommunicationHomeScreen(
                         }
                     }
                 }
+            }
+
+            phrases?.let { controller ->
+                PersonalPhrasesSection(controller) { displayedMessage = it }
             }
 
             if (visualNoticeEnabled) {
@@ -228,15 +245,15 @@ private fun HomeActionCard(label: String, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 144.dp)
-            .clickable(onClick = onClick),
+            .heightIn(min = 56.dp)
+            .clickable(role = Role.Button, onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
     ) {
         Text(
             text = label,
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
             color = MaterialTheme.colorScheme.onSecondaryContainer,
-            style = MaterialTheme.typography.titleLarge
+            style = MaterialTheme.typography.titleMedium
         )
     }
 }

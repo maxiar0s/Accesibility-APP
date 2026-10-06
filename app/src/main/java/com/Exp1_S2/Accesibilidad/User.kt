@@ -3,14 +3,11 @@ package com.Exp1_S2.Accesibilidad
 data class User(
     val name: String,
     val email: String,
-    val password: String,
-    val communicationPreference: CommunicationPreference,
-    val primaryCommunicationMode: CommunicationMode,
-    val accessibilityPreferences: Set<AccessibilityPreference>
+    val uid: String = "",
+    val communicationPreference: CommunicationPreference = CommunicationPreference.EMAIL,
+    val primaryCommunicationMode: CommunicationMode = CommunicationMode.WRITTEN,
+    val accessibilityPreferences: Set<AccessibilityPreference> = emptySet()
 )
-
-fun authenticateUser(users: Array<User?>, email: String, password: String): Boolean =
-    users.any { user -> user?.email == email && user?.password == password }
 
 enum class CommunicationPreference {
     EMAIL,

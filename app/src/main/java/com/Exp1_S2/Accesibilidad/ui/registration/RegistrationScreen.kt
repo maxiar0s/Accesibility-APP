@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -28,7 +28,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -37,13 +39,15 @@ import com.Exp1_S2.Accesibilidad.AccessibilityPreference
 import com.Exp1_S2.Accesibilidad.CommunicationMode
 import com.Exp1_S2.Accesibilidad.CommunicationPreference
 import com.Exp1_S2.Accesibilidad.User
+import com.Exp1_S2.Accesibilidad.auth.REGISTRATION_PASSWORD_HINT
+import com.Exp1_S2.Accesibilidad.auth.validateRegistration
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegistrationScreen(
-    users: List<User>,
-    onRegister: (User) -> Boolean,
-    onRegistrationSuccess: () -> Unit,
+    onRegister: (User, String) -> Unit,
+    busy: Boolean,
+    message: String?,
     modifier: Modifier = Modifier
 ) {
     var name by remember { mutableStateOf("") }
@@ -55,7 +59,6 @@ fun RegistrationScreen(
     var accessibilityPreferences by remember { mutableStateOf(emptySet<AccessibilityPreference>()) }
     var preferenceExpanded by remember { mutableStateOf(false) }
     var validationMessage by remember { mutableStateOf<String?>(null) }
-    var registrationSucceeded by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -69,7 +72,7 @@ fun RegistrationScreen(
             style = MaterialTheme.typography.headlineMedium
         )
         Text(
-            text = "Completá tus datos para crear una cuenta. Podés elegir cómo preferís recibir comunicaciones.",
+            text = "Completa tus datos para crear una cuenta. Puedes elegir cómo recibir comunicaciones.",
             style = MaterialTheme.typography.bodyLarge
         )
 
@@ -77,6 +80,7 @@ fun RegistrationScreen(
             value = name,
             onValueChange = { name = it },
             label = { Text("Nombre completo") },
+            supportingText = { Text("Al menos 3 caracteres sin espacios iniciales o finales") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
@@ -92,6 +96,7 @@ fun RegistrationScreen(
             value = password,
             onValueChange = { password = it },
             label = { Text("Contraseña") },
+            supportingText = { Text(REGISTRATION_PASSWORD_HINT) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             visualTransformation = PasswordVisualTransformation()
@@ -173,14 +178,11 @@ fun RegistrationScreen(
             }
         }
 
-        validationMessage?.let { message ->
+        (validationMessage ?: message)?.let { message ->
             Text(
                 text = message,
-                color = if (registrationSucceeded) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.error
-                },
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
+                color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyLarge
             )
         }
@@ -188,41 +190,25 @@ fun RegistrationScreen(
         Button(
             onClick = {
                 validationMessage = validateRegistration(name, email, password, confirmPassword)
-                registrationSucceeded = false
                 if (validationMessage == null) {
-                    val registered = onRegister(
+                    onRegister(
                         User(
                             name = name.trim(),
                             email = email.trim(),
-                            password = password,
                             communicationPreference = communicationPreference,
                             primaryCommunicationMode = primaryMode,
                             accessibilityPreferences = accessibilityPreferences
-                        )
+                        ), password
                     )
-                    registrationSucceeded = registered
-                    validationMessage = if (registered) {
-                        name = ""
-                        email = ""
-                        password = ""
-                        confirmPassword = ""
-                        "Cuenta registrada correctamente."
-                    } else {
-                        "No se pueden registrar más cuentas: se alcanzó el límite de cinco."
-                    }
-                    if (registered) {
-                        onRegistrationSuccess()
-                    }
                 }
             },
+            enabled = !busy,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .heightIn(min = 56.dp)
         ) {
-            Text("Registrar cuenta")
+            Text(if (busy) "Creando cuenta…" else "Registrar cuenta")
         }
-
-        UserSummary(users = users)
     }
 }
 
@@ -235,57 +221,28 @@ private fun SelectionSection(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun UserSummary(users: List<User>) {
+fun UserSummary(user: User) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         HorizontalDivider()
         Text(
-            text = "Cuentas registradas (${users.size} de 5)",
+            text = "Perfil actual",
             modifier = Modifier.semantics { heading() },
             style = MaterialTheme.typography.titleLarge
         )
-        if (users.isEmpty()) {
-            Text(
-                text = "Todavía no hay cuentas registradas. Completá el formulario para agregar la primera.",
-                style = MaterialTheme.typography.bodyLarge
-            )
-        } else {
-            Row(modifier = Modifier.fillMaxWidth()) {
-                SummaryCell("Nombre", Modifier.weight(1f), isHeader = true)
-                SummaryCell("Correo", Modifier.weight(1f), isHeader = true)
-                SummaryCell("Preferencia", Modifier.weight(1f), isHeader = true)
-            }
-            users.forEach { user ->
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    SummaryCell(user.name, Modifier.weight(1f))
-                    SummaryCell(user.email, Modifier.weight(1f))
-                    SummaryCell(user.communicationPreference.label(), Modifier.weight(1f))
-                }
-            }
-        }
+        SummaryRow("Nombre", user.name)
+        SummaryRow("Correo", user.email)
+        SummaryRow("Preferencia", user.communicationPreference.label())
+        SummaryRow("Modo de comunicación", user.primaryCommunicationMode.label())
+        SummaryRow("Accesibilidad", user.accessibilityPreferences.joinToString { it.label() }.ifEmpty { "Ninguna seleccionada" })
     }
 }
 
 @Composable
-private fun SummaryCell(text: String, modifier: Modifier, isHeader: Boolean = false) {
-    Text(
-        text = text,
-        modifier = modifier.padding(4.dp),
-        style = if (isHeader) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyMedium
-    )
-}
-
-private fun validateRegistration(
-    name: String,
-    email: String,
-    password: String,
-    confirmPassword: String
-): String? = when {
-    name.isBlank() || email.isBlank() || password.isBlank() || confirmPassword.isBlank() ->
-        "Completá todos los campos obligatorios."
-    !email.matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) ->
-        "Ingresá un correo electrónico válido."
-    password != confirmPassword -> "Las contraseñas no coinciden."
-    else -> null
+private fun SummaryRow(label: String, value: String) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        Text(value, style = MaterialTheme.typography.bodyLarge)
+    }
 }
 
 private fun CommunicationPreference.label(): String = when (this) {
