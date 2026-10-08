@@ -42,6 +42,7 @@ import com.Exp1_S2.Accesibilidad.speech.AndroidSpeechEngine
 import com.Exp1_S2.Accesibilidad.speech.SpeechController
 import com.Exp1_S2.Accesibilidad.speech.SpeechState
 import com.Exp1_S2.Accesibilidad.ui.registration.UserSummary
+import com.Exp1_S2.Accesibilidad.communication.CommunicationHistory
 
 private val quickPhrases = listOf(
     "Necesito ayuda, por favor.",
@@ -57,9 +58,27 @@ fun CommunicationHomeScreen(
     modifier: Modifier = Modifier,
     phrases: com.Exp1_S2.Accesibilidad.phrases.PersonalPhrases? = null,
     user: User? = null,
-    speechFactory: (() -> SpeechController)? = null
+    speechFactory: (() -> SpeechController)? = null,
+    history: CommunicationHistory? = null
 ) {
     val context = LocalContext.current.applicationContext
+    val historyController = history
+    var historyState by remember(historyController) {
+        mutableStateOf(historyController?.state ?: com.Exp1_S2.Accesibilidad.communication.CommunicationHistoryState())
+    }
+    DisposableEffect(historyController, user?.uid) {
+        historyController?.let { controller ->
+            controller.onChange = { historyState = it }
+            controller.bind(user?.uid)
+            historyState = controller.state
+        }
+        onDispose {
+            historyController?.let { controller ->
+                controller.onChange = null
+                controller.bind(null)
+            }
+        }
+    }
     val speech = remember(user?.uid, speechFactory) {
         speechFactory?.invoke() ?: SpeechController(AndroidSpeechEngine(context))
     }
@@ -81,6 +100,11 @@ fun CommunicationHomeScreen(
     fun display(message: String) {
         if (message != displayedMessage) speech.stop()
         displayedMessage = message
+    }
+
+    fun communicate(message: String) {
+        historyController?.save(message)
+        display(message)
     }
 
     LaunchedEffect(showMessageEditor) {
@@ -169,8 +193,9 @@ fun CommunicationHomeScreen(
             if (showMessageEditor) {
                 OutlinedTextField(
                     value = messageDraft,
-                    onValueChange = { messageDraft = it },
+                    onValueChange = { messageDraft = it.take(CommunicationHistory.MAX_MESSAGE_LENGTH) },
                     label = { Text("Mensaje") },
+                    supportingText = { Text("${messageDraft.length}/${CommunicationHistory.MAX_MESSAGE_LENGTH} caracteres") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusRequester(focusRequester),
@@ -181,7 +206,8 @@ fun CommunicationHomeScreen(
                         if (messageDraft.isBlank()) {
                             feedback = "Escribe un mensaje antes de enviarlo."
                         } else {
-                            display(messageDraft.trim())
+                            val message = messageDraft.trim()
+                            communicate(message)
                             messageDraft = ""
                             feedback = "Mensaje preparado para comunicar."
                         }
@@ -198,7 +224,7 @@ fun CommunicationHomeScreen(
                     quickPhrases.forEach { phrase ->
                         Button(
                             onClick = {
-                                display(phrase)
+                                communicate(phrase)
                                 feedback = "Frase rápida seleccionada."
                             },
                             modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
@@ -210,7 +236,11 @@ fun CommunicationHomeScreen(
             }
 
             phrases?.let { controller ->
-                PersonalPhrasesSection(controller) { display(it) }
+                PersonalPhrasesSection(controller, ::communicate)
+            }
+
+            if (user != null && historyController != null) {
+                CommunicationHistorySection(historyState, historyController, ::display)
             }
 
             if (visualNoticeEnabled) {

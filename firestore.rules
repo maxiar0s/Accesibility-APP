@@ -14,5 +14,22 @@ service cloud.firestore {
       allow read, delete: if owner();
       allow create, update: if owner() && validText();
     }
+
+    match /users/{userId}/communicationHistory/{messageId} {
+      function owner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+      function validMessage() {
+        return request.resource.data.keys().hasOnly(['text', 'createdAt'])
+          && request.resource.data.keys().hasAll(['text', 'createdAt'])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 500
+          && request.resource.data.createdAt is timestamp
+          && request.resource.data.createdAt == request.time;
+      }
+      allow read, delete: if owner();
+      allow create: if owner() && validMessage();
+    }
   }
 }

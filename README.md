@@ -9,7 +9,7 @@ An Android application that demonstrates an accessible account and communication
 | Login | Asynchronously signs in with Firebase Email/Password, with loading and understandable errors. |
 | Registration | Creates a Firebase account and saves submitted profile/preferences locally per uid, then signs out and returns to Login. |
 | Password recovery | Requests a Firebase password-reset email and displays a generic confirmation without exposing account existence. |
-| Communication home | Perfil actual plegable, frases personales privadas, mensajes locales, frases rápidas, aviso visual y cierre de sesión con Firebase. |
+| Communication home | Perfil actual plegable, frases personales privadas, historial de mensajes en Firestore, frases rápidas, aviso visual y cierre de sesión con Firebase. |
 
 ### Navigation flow
 
@@ -96,15 +96,15 @@ configuration, and access to dependency repositories. Run
 Email/Password enablement is user-confirmed but not remotely verified here.
 Provider configuration and Firestore security rules remain separately authorized external work.
 
-### Personal phrases: manual Firestore setup
+### Firestore setup: personal phrases and message history
 
 1. In your own Firebase Console project, create a **Cloud Firestore Standard edition** database with the default database ID. Choose a location appropriate for your users and production/locked rules, not open test access.
-2. Open its Rules tab. Review any existing rules before changing them: do not overwrite unrelated permissions blindly. For a new database, paste the root [`firestore.rules`](firestore.rules) contents and select **Publish** manually. Existing databases require merging this owner-only phrase match without broad rules that also grant access.
-3. Run the app yourself, sign in, and add a personal phrase. `users/{uid}/phrases/{id}` collections/documents are automatically created on the first write; no manual collection creation is needed. Select the phrase to display it, edit it, then confirm deletion.
+2. Open its Rules tab. Review any existing rules before changing them: do not overwrite unrelated permissions blindly. For a new database, paste the root [`firestore.rules`](firestore.rules) contents and select **Publish** manually. Existing databases require merging the owner-only phrase and `communicationHistory` matches without broad rules that also grant access.
+3. Sign in and add a personal phrase or send a written message. Firestore creates `users/{uid}/phrases/{id}` and `users/{uid}/communicationHistory/{id}` documents automatically; no manual collection creation is needed. Select a saved message to display it again or confirm its individual deletion.
 
-Each document contains only `text`. The controller trims input, enforces 1–500 characters, preserves drafts after failed writes, and prevents simultaneous mutations. A live list can contain pending local snapshots; the editor stays busy until the write completion callback. Offline writes can remain pending until reconnection. List errors offer retry.
+Phrase documents contain only `text`. Message-history documents contain only `text` and a server-generated `createdAt` timestamp. Message text is trimmed and limited to 1–500 characters in the client and rules; the live query displays at most the latest 100 messages. Written messages and quick or personal phrases selected for communication remain in the account's cloud history until individually deleted; replaying a history item does not create another entry. The app does not save passwords or authentication tokens. A live list can contain pending local snapshots; controls stay busy until a write completes. Offline writes can remain pending until reconnection. List errors offer retry.
 
-UID ownership comes from the authenticated session, not profile preferences. Logout/account change immediately cancels subscriptions and discards late callbacks; account-keyed Home state clears private drafts and displayed selections. The activity-owned controller survives configuration changes and closes with its ViewModel. Tests inject fake phrase gateways and never construct Firestore.
+UID ownership comes from the authenticated session, not profile preferences. Logout/account change immediately cancels subscriptions and discards late callbacks; account-keyed Home state clears private drafts and displayed selections. The activity-owned history controller survives configuration changes and closes with its ViewModel. Unit and Compose tests inject fake gateways and do not read or write a real Firestore project.
 
 **External setup is still pending/unknown.** The rules file is a proposal, not deployed or emulator-tested, and does not protect a remote database until you publish it. Local tests/builds do not demonstrate live persistence or remote access denial. No deployment targeting files are added.
 
@@ -127,7 +127,7 @@ git diff --check
 
 Open the project in Android Studio and run the `app` configuration to install the debug build. `connectedDebugAndroidTest` requires ADB plus a running emulator or connected, authorized device; it cannot be verified on a host with no connected Android target.
 
-Unit tests use deterministic fake authentication, fake phrase gateways, and an in-memory `PreferenceValues` backing store. They cover loading/results, registration warnings, identity-based restoration, uid isolation, logout, recovery, serialization, phrase CRUD/validation/write failures, listener cancellation, and late callbacks. They do not exercise real Firebase or Android SharedPreferences runtime. Compose tests inject fake sessions and phrase controllers, including a CRUD/selection case; compiling them is not executing them.
+Unit tests use deterministic fake authentication, phrase/history gateways, and an in-memory `PreferenceValues` backing store. They cover loading/results, registration warnings, identity-based restoration, uid isolation, logout, recovery, serialization, phrase CRUD, communication-history validation/CRUD, listener cancellation, and stale callbacks. They do not exercise real Firebase or Android SharedPreferences runtime. Compose tests inject fake sessions and controllers, including phrase and message-history selection/deletion flows; compiling them is not executing them.
 
 ### Remaining runtime and distribution checks
 

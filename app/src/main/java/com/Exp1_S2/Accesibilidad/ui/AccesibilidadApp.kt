@@ -15,6 +15,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.Exp1_S2.Accesibilidad.auth.AuthRoute
 import com.Exp1_S2.Accesibilidad.auth.AuthSession
 import com.Exp1_S2.Accesibilidad.auth.AuthSessionViewModel
+import com.Exp1_S2.Accesibilidad.communication.CommunicationHistory
 import com.Exp1_S2.Accesibilidad.phrases.PersonalPhrases
 import com.Exp1_S2.Accesibilidad.speech.SpeechController
 import com.Exp1_S2.Accesibilidad.ui.home.CommunicationHomeScreen
@@ -26,11 +27,13 @@ import com.Exp1_S2.Accesibilidad.ui.registration.RegistrationScreen
 fun AccesibilidadApp(
     session: AuthSession? = null,
     phrases: PersonalPhrases? = null,
-    speechFactory: (() -> SpeechController)? = null
+    speechFactory: (() -> SpeechController)? = null,
+    history: CommunicationHistory? = null
 ) {
     val owner = if (session == null) viewModel<AuthSessionViewModel>() else null
     val controller = session ?: requireNotNull(owner).session
     val phraseController = phrases ?: requireNotNull(owner) { "Inject phrases with a fake session." }.phrases
+    val historyController = history ?: owner?.communicationHistory
     var state by remember(controller) { mutableStateOf(controller.state) }
     DisposableEffect(controller, phraseController) {
         controller.onChange = {
@@ -72,7 +75,8 @@ fun AccesibilidadApp(
                 key(user.uid) {
                     CommunicationHomeScreen(
                         userName = user.name, onLogout = controller::logout,
-                        phrases = phraseController, user = user, speechFactory = speechFactory
+                        phrases = phraseController, user = user, speechFactory = speechFactory,
+                        history = historyController
                     )
                 }
             }

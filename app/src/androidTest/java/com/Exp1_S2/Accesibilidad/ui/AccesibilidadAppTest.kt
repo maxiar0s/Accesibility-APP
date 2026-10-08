@@ -15,6 +15,8 @@ import com.Exp1_S2.Accesibilidad.ui.theme.AccesibilidadTheme
 import com.Exp1_S2.Accesibilidad.auth.*
 import com.Exp1_S2.Accesibilidad.phrases.*
 import com.Exp1_S2.Accesibilidad.speech.*
+import com.Exp1_S2.Accesibilidad.User
+import com.Exp1_S2.Accesibilidad.communication.*
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -131,6 +133,28 @@ class AccesibilidadAppTest {
     }
 
     @Test
+    fun communicationHistory_selectsAndConfirmsIndividualDeletion() {
+        val history = CommunicationHistory(FakeHistoryGateway()).apply { bind("uid") }
+        composeTestRule.setContent {
+            AccesibilidadTheme {
+                CommunicationHomeScreen(
+                    userName = "Ana",
+                    onLogout = {},
+                    user = User("Ana", "ana@example.com", uid = "uid"),
+                    history = history,
+                    speechFactory = ::fakeSpeech
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("Mensaje guardado", useUnmergedTree = true)
+            .performScrollTo().performClick()
+        composeTestRule.onNodeWithText("Mensaje para comunicar").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Eliminar mensaje: Mensaje guardado").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("Confirmar eliminación del historial").performClick()
+        composeTestRule.onNodeWithText("Todavía no hay mensajes guardados.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
     fun selectedMessage_isReadOnlyOnClickAndCanBeStopped() {
         val engine = FakeSpeechEngine()
         val speech = SpeechController(engine)
@@ -149,6 +173,29 @@ class AccesibilidadAppTest {
     }
 
     private fun fakeSpeech() = SpeechController(FakeSpeechEngine())
+
+    private class FakeHistoryGateway : CommunicationHistoryGateway {
+        private var changed: ((Result<List<CommunicationMessage>>) -> Unit)? = null
+        private var messages = listOf(CommunicationMessage("message-id", "Mensaje guardado", 1L))
+
+        override fun listen(uid: String, changed: (Result<List<CommunicationMessage>>) -> Unit): HistorySubscription {
+            this.changed = changed
+            changed(Result.success(messages))
+            return HistorySubscription { this.changed = null }
+        }
+
+        override fun create(uid: String, text: String, done: (Result<Unit>) -> Unit) {
+            messages = messages + CommunicationMessage("created", text, 2L)
+            changed?.invoke(Result.success(messages))
+            done(Result.success(Unit))
+        }
+
+        override fun delete(uid: String, id: String, done: (Result<Unit>) -> Unit) {
+            messages = messages.filterNot { it.id == id }
+            changed?.invoke(Result.success(messages))
+            done(Result.success(Unit))
+        }
+    }
 
     private class FakeSpeechEngine : SpeechEngine {
         var text: String? = null
