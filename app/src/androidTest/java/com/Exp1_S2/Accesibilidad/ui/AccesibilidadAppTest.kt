@@ -155,6 +155,29 @@ class AccesibilidadAppTest {
     }
 
     @Test
+    fun selectingHistoryMessageBringsActiveCardIntoViewport() {
+        val history = CommunicationHistory(FakeHistoryGateway(includeMany = true)).apply { bind("uid") }
+        composeTestRule.setContent {
+            AccesibilidadTheme {
+                CommunicationHomeScreen(
+                    userName = "Ana",
+                    onLogout = {},
+                    user = User("Ana", "ana@example.com", uid = "uid"),
+                    history = history,
+                    speechFactory = ::fakeSpeech
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Mensaje guardado").performScrollTo().performClick()
+
+        composeTestRule.onNodeWithText("Mensaje para comunicar").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Eliminar mensaje: Mensaje guardado 1").performScrollTo()
+        composeTestRule.onNodeWithText("Mensaje guardado").performScrollTo().performClick()
+        composeTestRule.onNodeWithText("Mensaje para comunicar").assertIsDisplayed()
+    }
+
+    @Test
     fun selectedMessage_isReadOnlyOnClickAndCanBeStopped() {
         val engine = FakeSpeechEngine()
         val speech = SpeechController(engine)
@@ -174,9 +197,11 @@ class AccesibilidadAppTest {
 
     private fun fakeSpeech() = SpeechController(FakeSpeechEngine())
 
-    private class FakeHistoryGateway : CommunicationHistoryGateway {
+    private class FakeHistoryGateway(private val includeMany: Boolean = false) : CommunicationHistoryGateway {
         private var changed: ((Result<List<CommunicationMessage>>) -> Unit)? = null
-        private var messages = listOf(CommunicationMessage("message-id", "Mensaje guardado", 1L))
+        private var messages = if (includeMany) (1..40).map { index ->
+            CommunicationMessage("message-id-$index", if (index == 40) "Mensaje guardado" else "Mensaje guardado $index", index.toLong())
+        } else listOf(CommunicationMessage("message-id", "Mensaje guardado", 1L))
 
         override fun listen(uid: String, changed: (Result<List<CommunicationMessage>>) -> Unit): HistorySubscription {
             this.changed = changed
@@ -192,6 +217,12 @@ class AccesibilidadAppTest {
 
         override fun delete(uid: String, id: String, done: (Result<Unit>) -> Unit) {
             messages = messages.filterNot { it.id == id }
+            changed?.invoke(Result.success(messages))
+            done(Result.success(Unit))
+        }
+
+        override fun clearAll(uid: String, done: (Result<Unit>) -> Unit) {
+            messages = emptyList()
             changed?.invoke(Result.success(messages))
             done(Result.success(Unit))
         }

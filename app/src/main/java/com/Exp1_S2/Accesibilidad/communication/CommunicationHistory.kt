@@ -7,6 +7,7 @@ interface CommunicationHistoryGateway {
     fun listen(uid: String, changed: (Result<List<CommunicationMessage>>) -> Unit): HistorySubscription
     fun create(uid: String, text: String, done: (Result<Unit>) -> Unit)
     fun delete(uid: String, id: String, done: (Result<Unit>) -> Unit)
+    fun clearAll(uid: String, done: (Result<Unit>) -> Unit)
 }
 
 data class CommunicationHistoryState(
@@ -60,15 +61,27 @@ class CommunicationHistory(private val gateway: CommunicationHistoryGateway) {
         }
     }
 
-    fun save(text: String) {
-        val owner = uid ?: return
-        if (closed || state.writing) return
+    fun save(text: String, completed: ((Result<Unit>) -> Unit)? = null) {
+        if (closed) {
+            completed?.invoke(Result.failure(IllegalStateException("History controller is closed.")))
+            return
+        }
+        val owner = uid
+        if (owner == null) {
+            completed?.invoke(Result.failure(IllegalStateException("No signed-in user.")))
+            return
+        }
+        if (state.writing) {
+            completed?.invoke(Result.failure(IllegalStateException("A history write is already in progress.")))
+            return
+        }
         val message = text.trim()
         if (message.isEmpty() || message.length > MAX_MESSAGE_LENGTH) {
             publish(state.copy(error = "El mensaje debe tener entre 1 y $MAX_MESSAGE_LENGTH caracteres.", notice = null))
+            completed?.invoke(Result.failure(IllegalArgumentException("Message length is invalid.")))
             return
         }
-        mutate(owner, "No se pudo guardar el mensaje. Inténtalo de nuevo.") { done -> gateway.create(owner, message, done) }
+        mutate(owner, "No se pudo guardar el mensaje. Inténtalo de nuevo.", completed) { done -> gateway.create(owner, message, done) }
     }
 
     fun delete(id: String) {
@@ -77,14 +90,30 @@ class CommunicationHistory(private val gateway: CommunicationHistoryGateway) {
         mutate(owner, "No se pudo eliminar el mensaje. Inténtalo de nuevo.") { done -> gateway.delete(owner, id, done) }
     }
 
-    private fun mutate(owner: String, failure: String, write: ((Result<Unit>) -> Unit) -> Unit) {
+    fun clearAll() {
+        val owner = uid ?: return
+        if (closed || state.writing) return
+        mutate(owner, "No se pudo eliminar todo el historial. Inténtalo de nuevo.") { done ->
+            gateway.clearAll(owner, done)
+        }
+    }
+
+    private fun mutate(
+        owner: String,
+        failure: String,
+        completed: ((Result<Unit>) -> Unit)? = null,
+        write: ((Result<Unit>) -> Unit) -> Unit
+    ) {
         val operation = generation
         publish(state.copy(writing = true, error = null, notice = null))
         write { result ->
-            if (active(owner, operation)) publish(result.fold(
-                onSuccess = { state.copy(writing = false, notice = "Cambio guardado.") },
-                onFailure = { state.copy(writing = false, error = failure) }
-            ))
+            if (active(owner, operation)) {
+                publish(result.fold(
+                    onSuccess = { state.copy(writing = false, notice = "Cambio guardado.") },
+                    onFailure = { state.copy(writing = false, error = failure) }
+                ))
+                completed?.invoke(result)
+            }
         }
     }
 

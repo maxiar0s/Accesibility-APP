@@ -1,5 +1,10 @@
 package com.Exp1_S2.Accesibilidad.ui.home
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -41,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.Exp1_S2.Accesibilidad.speech.AndroidSpeechEngine
 import com.Exp1_S2.Accesibilidad.speech.SpeechController
 import com.Exp1_S2.Accesibilidad.speech.SpeechState
+import com.Exp1_S2.Accesibilidad.speech.normalizeSpeechResult
 import com.Exp1_S2.Accesibilidad.ui.registration.UserSummary
 import com.Exp1_S2.Accesibilidad.communication.CommunicationHistory
 
@@ -91,15 +99,18 @@ fun CommunicationHomeScreen(
     var profileExpanded by remember(user?.uid) { mutableStateOf(false) }
     var messageDraft by remember { mutableStateOf("") }
     var displayedMessage by remember { mutableStateOf<String?>(null) }
+    var displayRequest by remember { mutableStateOf(0) }
     var showMessageEditor by remember { mutableStateOf(false) }
     var showQuickPhrases by remember { mutableStateOf(false) }
     var visualNoticeEnabled by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
     val focusRequester = remember { FocusRequester() }
+    val messageBringIntoViewRequester = remember { BringIntoViewRequester() }
 
     fun display(message: String) {
         if (message != displayedMessage) speech.stop()
         displayedMessage = message
+        displayRequest++
     }
 
     fun communicate(message: String) {
@@ -107,8 +118,39 @@ fun CommunicationHomeScreen(
         display(message)
     }
 
+    val speechRecognitionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val transcript = normalizeSpeechResult(
+                result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            )
+            if (transcript == null) {
+                feedback = "El mensaje dictado está vacío o supera el límite de ${CommunicationHistory.MAX_MESSAGE_LENGTH} caracteres."
+            } else {
+                display(transcript)
+                if (historyController == null) {
+                    feedback = "Mensaje mostrado, pero no guardado: el historial no está disponible."
+                } else {
+                    historyController.save(transcript) { result ->
+                        feedback = if (result.isSuccess) {
+                            "Mensaje reconocido y guardado como texto."
+                        } else {
+                            "Mensaje mostrado, pero no guardado. ${result.exceptionOrNull()?.message.orEmpty()}"
+                        }
+                    }
+                }
+            }
+        } else {
+            feedback = "Dictado cancelado. No se guardó ningún mensaje."
+        }
+    }
+
     LaunchedEffect(showMessageEditor) {
         if (showMessageEditor) focusRequester.requestFocus()
+    }
+    LaunchedEffect(displayRequest) {
+        if (displayedMessage != null) messageBringIntoViewRequester.bringIntoView()
     }
 
     Scaffold(
@@ -167,6 +209,18 @@ fun CommunicationHomeScreen(
                                 showQuickPhrases = false
                                 feedback = "Escribe tu mensaje y luego selecciona Enviar mensaje."
                             })
+                            "Dictar mensaje" -> ({
+                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es")
+                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Habla para mostrar tu mensaje")
+                                }
+                                try {
+                                    speechRecognitionLauncher.launch(intent)
+                                } catch (_: android.content.ActivityNotFoundException) {
+                                    feedback = "El reconocimiento de voz no está disponible en este dispositivo."
+                                }
+                            })
                             "Frases rápidas" -> ({
                                 showQuickPhrases = !showQuickPhrases
                                 showMessageEditor = false
@@ -189,6 +243,7 @@ fun CommunicationHomeScreen(
                     )
                 }
             }
+            Text("El dictado usa el servicio de voz configurado en Android y puede requerir Internet. Solo se guarda el texto, no el audio.")
 
             if (showMessageEditor) {
                 OutlinedTextField(
@@ -221,6 +276,7 @@ fun CommunicationHomeScreen(
             if (showQuickPhrases) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Frases rápidas", style = MaterialTheme.typography.titleLarge)
+                    Text("Mensajes habituales. Añade y edita tus frases personales más abajo.")
                     quickPhrases.forEach { phrase ->
                         Button(
                             onClick = {
@@ -235,8 +291,33 @@ fun CommunicationHomeScreen(
                 }
             }
 
+            displayedMessage?.let { message ->
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.inverseSurface,
+                        contentColor = MaterialTheme.colorScheme.inverseOnSurface
+                    ),
+                    modifier = Modifier.fillMaxWidth().bringIntoViewRequester(messageBringIntoViewRequester)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Mensaje para comunicar", style = MaterialTheme.typography.titleMedium)
+                        Text(message, style = MaterialTheme.typography.headlineLarge)
+                        Button(
+                            onClick = { speech.speak(message) },
+                            enabled = speechState == SpeechState.READY || speechState == SpeechState.ERROR,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                        ) { Text("Leer en voz alta") }
+                        Button(
+                            onClick = speech::stop,
+                            enabled = speechState == SpeechState.SPEAKING,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                        ) { Text("Detener voz") }
+                    }
+                }
+            }
+
             phrases?.let { controller ->
-                PersonalPhrasesSection(controller, ::communicate)
+                PersonalPhrasesSection(controller, ::communicate, title = "Personaliza tus mensajes rápidos")
             }
 
             if (user != null && historyController != null) {
@@ -259,31 +340,6 @@ fun CommunicationHomeScreen(
                 }
             }
 
-            displayedMessage?.let { message ->
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.inverseSurface,
-                        contentColor = MaterialTheme.colorScheme.inverseOnSurface
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Mensaje para comunicar", style = MaterialTheme.typography.titleMedium)
-                        Text(message, style = MaterialTheme.typography.headlineSmall)
-                        Button(
-                            onClick = { speech.speak(message) },
-                            enabled = speechState == SpeechState.READY || speechState == SpeechState.ERROR,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
-                        ) { Text("Leer en voz alta") }
-                        Button(
-                            onClick = speech::stop,
-                            enabled = speechState == SpeechState.SPEAKING,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
-                        ) { Text("Detener voz") }
-                    }
-                }
-            }
-
             Text(
                 speechState.message,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
@@ -301,7 +357,8 @@ fun CommunicationHomeScreen(
 }
 
 private val homeActions = listOf(
-    "Escribir mensaje",
+                    "Escribir mensaje",
+                    "Dictar mensaje",
     "Frases rápidas",
     "Aviso visual"
 )

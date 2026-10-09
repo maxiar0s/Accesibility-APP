@@ -9,7 +9,7 @@ An Android application that demonstrates an accessible account and communication
 | Login | Asynchronously signs in with Firebase Email/Password, with loading and understandable errors. |
 | Registration | Creates a Firebase account and saves submitted profile/preferences locally per uid, then signs out and returns to Login. |
 | Password recovery | Requests a Firebase password-reset email and displays a generic confirmation without exposing account existence. |
-| Communication home | Perfil actual plegable, frases personales privadas, historial de mensajes en Firestore, frases rápidas, aviso visual y cierre de sesión con Firebase. |
+| Communication home | Perfil actual plegable, mensajes hablados transcritos en texto grande, frases rápidas personalizables, historial de mensajes en Firestore, aviso visual y cierre de sesión con Firebase. |
 
 ### Navigation flow
 
@@ -65,11 +65,15 @@ Estas reglas se comparten entre formulario y controlador y se aplican **solo en 
 
 Para actualizar en el teléfono, instala desde Android Studio la configuración `app` sobre la aplicación existente con el mismo identificador y firma, sin desinstalar ni borrar sus datos. Si Android informa una firma incompatible, no borres la aplicación: utiliza la misma configuración de firma que la instalación anterior. Este cambio no elimina cuentas ni transforma frases guardadas; la instalación en un dispositivo queda fuera de esta comprobación local.
 
-### Lectura en voz alta
+### Voz y mensajes rápidos
 
 Al mostrar un mensaje escrito, una frase rápida o una frase personal, **Leer en voz alta** reproduce exactamente ese texto en español. Seleccionar o enviar un mensaje no inicia audio automáticamente. **Detener voz** cancela la lectura; cambiar el mensaje, salir de Home o cambiar de cuenta también detiene la voz y libera el motor cuando corresponde.
 
-Se necesita un motor Android TextToSpeech con datos de español disponibles. La pantalla informa la preparación, la lectura, los errores y la falta de voz española; no sustituye silenciosamente el idioma. Si no está disponible, revisa la configuración de texto a voz del dispositivo. No se añade reconocimiento de voz ni permiso de micrófono.
+Se necesita un motor Android TextToSpeech con datos de español disponibles. La pantalla informa la preparación, la lectura, los errores y la falta de voz española; no sustituye silenciosamente el idioma. Si no está disponible, revisa la configuración de texto a voz del dispositivo.
+
+**Dictar mensaje** abre el servicio de reconocimiento de voz configurado en Android en español. El servicio puede requerir conexión a Internet y disponibilidad del proveedor; Android puede solicitar permiso de micrófono dentro de esa interfaz. Si el servicio no existe, el resultado está vacío o se cancela, la aplicación lo informa y no guarda ningún mensaje. La aplicación no captura ni conserva audio: solo guarda el texto reconocido en el historial de la cuenta.
+
+En **Frases rápidas** se mantienen las frases incluidas y también se pueden crear, editar, seleccionar y eliminar frases personales. Estas últimas usan la colección existente `users/{uid}/phrases`. En el historial, **Eliminar todo el historial** pide confirmación y elimina todos los documentos de `communicationHistory` del usuario en lotes, incluidos los que no están en la lista más reciente de 100; no elimina frases personales. Si una operación falla, la pantalla muestra un error en lugar de confirmar éxito.
 
 Las pruebas locales usan un motor falso; compilar el adaptador comprueba las API del SDK, pero no demuestra audio audible, disponibilidad de español ni funcionamiento en un dispositivo. La generación de un APK firmado sigue pendiente: consulta la [guía de firma](docs/signing-apk.md).
 
@@ -102,7 +106,7 @@ Provider configuration and Firestore security rules remain separately authorized
 2. Open its Rules tab. Review any existing rules before changing them: do not overwrite unrelated permissions blindly. For a new database, paste the root [`firestore.rules`](firestore.rules) contents and select **Publish** manually. Existing databases require merging the owner-only phrase and `communicationHistory` matches without broad rules that also grant access.
 3. Sign in and add a personal phrase or send a written message. Firestore creates `users/{uid}/phrases/{id}` and `users/{uid}/communicationHistory/{id}` documents automatically; no manual collection creation is needed. Select a saved message to display it again or confirm its individual deletion.
 
-Phrase documents contain only `text`. Message-history documents contain only `text` and a server-generated `createdAt` timestamp. Message text is trimmed and limited to 1–500 characters in the client and rules; the live query displays at most the latest 100 messages. Written messages and quick or personal phrases selected for communication remain in the account's cloud history until individually deleted; replaying a history item does not create another entry. The app does not save passwords or authentication tokens. A live list can contain pending local snapshots; controls stay busy until a write completes. Offline writes can remain pending until reconnection. List errors offer retry.
+Phrase documents contain only `text`. Message-history documents contain only `text` and a server-generated `createdAt` timestamp, including speech transcripts; raw audio is never stored. Message text is trimmed and limited to 1–500 characters in the client and rules; the live query displays at most the latest 100 messages. Written messages and quick or personal phrases selected for communication remain in the account's cloud history until individually or collectively deleted; replaying a history item does not create another entry. The app does not save passwords or authentication tokens. A live list can contain pending local snapshots; controls stay busy until a write completes. Offline writes can remain pending until reconnection. List errors offer retry.
 
 UID ownership comes from the authenticated session, not profile preferences. Logout/account change immediately cancels subscriptions and discards late callbacks; account-keyed Home state clears private drafts and displayed selections. The activity-owned history controller survives configuration changes and closes with its ViewModel. Unit and Compose tests inject fake gateways and do not read or write a real Firestore project.
 

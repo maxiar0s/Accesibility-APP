@@ -33,6 +33,7 @@ fun CommunicationHistorySection(
     onSelect: (String) -> Unit
 ) {
     var deleting by remember { mutableStateOf<CommunicationMessage?>(null) }
+    var confirmingClear by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             "Historial de mensajes",
@@ -40,6 +41,11 @@ fun CommunicationHistorySection(
             modifier = Modifier.semantics { heading() }
         )
         Text("Tus mensajes se guardan en la nube en tu cuenta. Puedes eliminar cada mensaje desde esta lista.")
+        TextButton(
+            onClick = { confirmingClear = true },
+            enabled = !state.writing && state.messages.isNotEmpty(),
+            modifier = Modifier.heightIn(min = 48.dp)
+        ) { Text("Eliminar todo el historial") }
         if (state.loading) Text("Cargando historial…")
         state.error?.let { error ->
             Text(error, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
@@ -87,6 +93,22 @@ fun CommunicationHistorySection(
             },
             dismissButton = {
                 TextButton(onClick = { deleting = null }) { Text("Cancelar eliminación") }
+            }
+        )
+    }
+    if (confirmingClear) {
+        AlertDialog(
+            onDismissRequest = { confirmingClear = false },
+            title = { Text("¿Eliminar todo el historial?") },
+            text = { Text("Se eliminarán todos tus mensajes guardados, incluso los que no aparecen en esta lista. Tus frases personales no se eliminarán.") },
+            confirmButton = {
+                TextButton(
+                    onClick = { controller.clearAll(); confirmingClear = false },
+                    enabled = !state.writing
+                ) { Text("Confirmar eliminación de todo el historial") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingClear = false }) { Text("Cancelar") }
             }
         )
     }

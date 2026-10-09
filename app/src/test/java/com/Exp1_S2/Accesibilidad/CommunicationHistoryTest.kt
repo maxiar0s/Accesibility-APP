@@ -29,6 +29,19 @@ class CommunicationHistoryTest {
         assertNotNull(history.state.notice)
     }
 
+    @Test fun clearsAllOwnedHistoryAndReportsFailure() {
+        val gateway = FakeGateway()
+        val history = CommunicationHistory(gateway).apply { bind("uid-a") }
+
+        history.clearAll()
+
+        assertEquals("uid-a", gateway.clearUid)
+        assertTrue(history.state.writing)
+        gateway.clearDone(Result.failure(IllegalStateException()))
+        assertFalse(history.state.writing)
+        assertNotNull(history.state.error)
+    }
+
     @Test fun rejectsBlankAndOverLimitMessages() {
         val gateway = FakeGateway()
         val history = CommunicationHistory(gateway).apply { bind("uid-a") }
@@ -36,6 +49,75 @@ class CommunicationHistoryTest {
         assertNotNull(history.state.error)
         history.save("x".repeat(CommunicationHistory.MAX_MESSAGE_LENGTH + 1))
         assertNotNull(history.state.error)
+        assertNull(gateway.savedText)
+    }
+
+    @Test fun saveReportsInvalidAndBusyRejectionsAndAsyncFailure() {
+        val gateway = FakeGateway()
+        val history = CommunicationHistory(gateway).apply { bind("uid-a") }
+        var callbackResult: Result<Unit>? = null
+
+        history.save("x".repeat(CommunicationHistory.MAX_MESSAGE_LENGTH + 1)) { callbackResult = it }
+        assertTrue(callbackResult?.isFailure == true)
+        assertNull(gateway.savedText)
+
+        history.save("first")
+        history.save("second") { callbackResult = it }
+        assertTrue(callbackResult?.isFailure == true)
+        assertEquals("first", gateway.savedText)
+
+        callbackResult = null
+        gateway.saveDone(Result.success(Unit))
+        assertFalse(history.state.writing)
+
+        history.save("first-success") { callbackResult = it }
+        assertNull(callbackResult)
+        gateway.saveDone(Result.success(Unit))
+        assertTrue(callbackResult?.isSuccess == true)
+
+        callbackResult = null
+        history.save("failure") { callbackResult = it }
+        assertNull(callbackResult)
+        gateway.saveDone(Result.failure(IllegalStateException("offline")))
+        assertTrue(callbackResult?.isFailure == true)
+        assertFalse(history.state.writing)
+        assertNotNull(history.state.error)
+    }
+
+    @Test fun staleSaveCompletionsAfterRebindOrCloseDoNotReportSuccess() {
+        val gateway = FakeGateway()
+        val history = CommunicationHistory(gateway).apply { bind("uid-a") }
+        var callbackResult: Result<Unit>? = null
+
+        history.save("rebind") { callbackResult = it }
+        assertNull(callbackResult)
+        val rebindCompletion = gateway.saveDone
+        history.bind("uid-b")
+        rebindCompletion(Result.success(Unit))
+        assertNull(callbackResult)
+
+        history.save("close") { callbackResult = it }
+        assertNull(callbackResult)
+        val closeCompletion = gateway.saveDone
+        history.close()
+        closeCompletion(Result.success(Unit))
+        assertNull(callbackResult)
+    }
+
+    @Test fun saveReportsMissingUidAndClosedController() {
+        val gateway = FakeGateway()
+        val history = CommunicationHistory(gateway)
+        var callbackResult: Result<Unit>? = null
+
+        history.save("hello") { callbackResult = it }
+        assertTrue(callbackResult?.isFailure == true)
+        assertNull(gateway.savedText)
+
+        history.bind("uid-a")
+        history.close()
+        callbackResult = null
+        history.save("hello") { callbackResult = it }
+        assertTrue(callbackResult?.isFailure == true)
         assertNull(gateway.savedText)
     }
 
@@ -60,9 +142,11 @@ class CommunicationHistoryTest {
         var writeUid: String? = null
         var savedText: String? = null
         var deletedId: String? = null
+        var clearUid: String? = null
         lateinit var listener: (Result<List<CommunicationMessage>>) -> Unit
         lateinit var saveDone: (Result<Unit>) -> Unit
         lateinit var deleteDone: (Result<Unit>) -> Unit
+        lateinit var clearDone: (Result<Unit>) -> Unit
         override fun listen(uid: String, changed: (Result<List<CommunicationMessage>>) -> Unit): HistorySubscription {
             listenUid = uid; listener = changed
             return HistorySubscription { }
@@ -72,6 +156,9 @@ class CommunicationHistoryTest {
         }
         override fun delete(uid: String, id: String, done: (Result<Unit>) -> Unit) {
             writeUid = uid; deletedId = id; deleteDone = done
+        }
+        override fun clearAll(uid: String, done: (Result<Unit>) -> Unit) {
+            clearUid = uid; clearDone = done
         }
         fun emit(result: Result<List<CommunicationMessage>>) = listener(result)
     }

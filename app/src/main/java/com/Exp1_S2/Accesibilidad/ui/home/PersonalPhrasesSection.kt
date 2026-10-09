@@ -16,7 +16,11 @@ import com.Exp1_S2.Accesibilidad.phrases.PersonalPhrase
 import com.Exp1_S2.Accesibilidad.phrases.PersonalPhrases
 
 @Composable
-fun PersonalPhrasesSection(controller: PersonalPhrases, onSelect: (String) -> Unit) {
+fun PersonalPhrasesSection(
+    controller: PersonalPhrases,
+    onSelect: (String) -> Unit,
+    title: String = "Frases personales"
+) {
     var state by remember(controller) { mutableStateOf(controller.state) }
     var deleting by remember { mutableStateOf<PersonalPhrase?>(null) }
     DisposableEffect(controller) {
@@ -25,8 +29,9 @@ fun PersonalPhrasesSection(controller: PersonalPhrases, onSelect: (String) -> Un
         onDispose { controller.onChange = null }
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Frases personales", style = MaterialTheme.typography.titleLarge,
+        Text(title, style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.semantics { heading() })
+        Text("Personaliza tus mensajes rápidos: crea, edita o elimina tus frases. Se guardan en tu cuenta.")
         if (state.loading) Text("Cargando frases personales…")
         state.listError?.let {
             Text(it, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })

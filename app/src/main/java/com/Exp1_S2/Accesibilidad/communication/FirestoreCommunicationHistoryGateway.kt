@@ -38,6 +38,26 @@ class FirestoreCommunicationHistoryGateway(private val firestore: FirebaseFirest
         collection(uid).document(id).delete().complete(done)
     }
 
+    override fun clearAll(uid: String, done: (Result<Unit>) -> Unit) {
+        val messages = collection(uid)
+        fun deleteNextBatch() {
+            messages.limit(DELETE_BATCH_SIZE).get()
+                .addOnSuccessListener { snapshot ->
+                    if (snapshot.isEmpty) {
+                        done(Result.success(Unit))
+                    } else {
+                        val batch = firestore.batch()
+                        snapshot.documents.forEach { batch.delete(it.reference) }
+                        batch.commit()
+                            .addOnSuccessListener { deleteNextBatch() }
+                            .addOnFailureListener { done(Result.failure(it)) }
+                    }
+                }
+                .addOnFailureListener { done(Result.failure(it)) }
+        }
+        deleteNextBatch()
+    }
+
     private fun <T> Task<T>.complete(done: (Result<Unit>) -> Unit) {
         addOnSuccessListener { done(Result.success(Unit)) }
         addOnFailureListener { done(Result.failure(it)) }
@@ -46,6 +66,7 @@ class FirestoreCommunicationHistoryGateway(private val firestore: FirebaseFirest
     companion object {
         const val COLLECTION = "communicationHistory"
         const val MAX_HISTORY_ITEMS = 100L
+        private const val DELETE_BATCH_SIZE = 450L
 
         internal fun newMessageData(text: String): Map<String, Any> = mapOf(
             "text" to text,
