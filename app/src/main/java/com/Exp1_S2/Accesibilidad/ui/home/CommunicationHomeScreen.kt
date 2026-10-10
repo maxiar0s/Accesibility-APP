@@ -25,6 +25,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -104,6 +106,7 @@ fun CommunicationHomeScreen(
     var showQuickPhrases by remember { mutableStateOf(false) }
     var visualNoticeEnabled by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<String?>(null) }
+    var selectedSection by remember { mutableStateOf(0) }
     val focusRequester = remember { FocusRequester() }
     val messageBringIntoViewRequester = remember { BringIntoViewRequester() }
 
@@ -116,6 +119,7 @@ fun CommunicationHomeScreen(
     fun communicate(message: String) {
         historyController?.save(message)
         display(message)
+        selectedSection = 0
     }
 
     val speechRecognitionLauncher = rememberLauncherForActivityResult(
@@ -166,14 +170,26 @@ fun CommunicationHomeScreen(
             )
         }
     ) { innerPadding ->
+        Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            TabRow(selectedTabIndex = selectedSection) {
+                listOf("Comunicar", "Frases", "Historial").forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedSection == index,
+                        onClick = { selectedSection = index },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                        text = { Text(title) }
+                    )
+                }
+            }
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
                 .padding(horizontal = 20.dp, vertical = 16.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            when (selectedSection) {
+                0 -> {
             Text(
                 text = if (userName.isNullOrBlank()) "Bienvenido/a" else "Bienvenido/a, $userName",
                 modifier = Modifier.semantics { heading() },
@@ -316,14 +332,6 @@ fun CommunicationHomeScreen(
                 }
             }
 
-            phrases?.let { controller ->
-                PersonalPhrasesSection(controller, ::communicate, title = "Personaliza tus mensajes rápidos")
-            }
-
-            if (user != null && historyController != null) {
-                CommunicationHistorySection(historyState, historyController, ::display)
-            }
-
             if (visualNoticeEnabled) {
                 Card(
                     colors = CardDefaults.cardColors(
@@ -339,6 +347,23 @@ fun CommunicationHomeScreen(
                     )
                 }
             }
+                }
+                1 -> {
+                    Text("Frases", modifier = Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
+                    phrases?.let { controller ->
+                        PersonalPhrasesSection(controller, ::communicate, title = "Personaliza tus mensajes rápidos")
+                    }
+                }
+                2 -> {
+                    Text("Historial", modifier = Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium)
+                    if (user != null && historyController != null) {
+                        CommunicationHistorySection(historyState, historyController) { message ->
+                            display(message)
+                            selectedSection = 0
+                        }
+                    }
+                }
+            }
 
             Text(
                 speechState.message,
@@ -352,6 +377,7 @@ fun CommunicationHomeScreen(
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
+        }
         }
     }
 }

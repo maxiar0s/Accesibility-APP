@@ -1,6 +1,7 @@
 package com.Exp1_S2.Accesibilidad.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -64,6 +65,7 @@ class AccesibilidadAppTest {
             }
         }
 
+        composeTestRule.onNodeWithText("Comunicar").assertIsSelected()
         composeTestRule.onNodeWithText("Frases rápidas").performClick()
         composeTestRule.onNodeWithText("Necesito ayuda, por favor.").performScrollTo().performClick()
 
@@ -120,10 +122,12 @@ class AccesibilidadAppTest {
         composeTestRule.setContent {
             AccesibilidadTheme { CommunicationHomeScreen("Ana", {}, phrases = phrases, speechFactory = ::fakeSpeech) }
         }
+        composeTestRule.onNode(hasText("Frases") and hasClickAction()).performClick()
         composeTestRule.onNodeWithText("Texto de la frase personal").performScrollTo().performTextInput("Hello")
         composeTestRule.onNodeWithText("Añadir frase").performScrollTo().performClick()
         composeTestRule.onNode(hasText("Hello") and hasClickAction()).performScrollTo().performClick()
         composeTestRule.onNodeWithText("Mensaje para comunicar").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNode(hasText("Frases") and hasClickAction()).performClick()
         composeTestRule.onNodeWithText("Editar frase: Hello").performScrollTo().performClick()
         composeTestRule.runOnIdle { phrases.draft("Changed") }
         composeTestRule.onNodeWithText("Guardar frase").performScrollTo().performClick()
@@ -146,12 +150,28 @@ class AccesibilidadAppTest {
                 )
             }
         }
+        composeTestRule.onNode(hasText("Historial") and hasClickAction()).performClick()
         composeTestRule.onNodeWithText("Mensaje guardado", useUnmergedTree = true)
             .performScrollTo().performClick()
         composeTestRule.onNodeWithText("Mensaje para comunicar").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNode(hasText("Historial") and hasClickAction()).performClick()
         composeTestRule.onNodeWithText("Eliminar mensaje: Mensaje guardado").performScrollTo().performClick()
         composeTestRule.onNodeWithText("Confirmar eliminación del historial").performClick()
         composeTestRule.onNodeWithText("Todavía no hay mensajes guardados.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun communicationHome_tabsSelectTheirSections() {
+        composeTestRule.setContent {
+            AccesibilidadTheme {
+                CommunicationHomeScreen(userName = "Ana", onLogout = {}, phrases = fakePhrases(), speechFactory = ::fakeSpeech)
+            }
+        }
+
+        composeTestRule.onNode(hasText("Frases") and hasClickAction()).performClick().assertIsSelected()
+        composeTestRule.onNodeWithText("Personaliza tus mensajes rápidos").assertIsDisplayed()
+        composeTestRule.onNode(hasText("Historial") and hasClickAction()).performClick().assertIsSelected()
+        composeTestRule.onNode(hasText("Comunicar") and hasClickAction()).performClick().assertIsSelected()
     }
 
     @Test
@@ -169,10 +189,12 @@ class AccesibilidadAppTest {
             }
         }
 
+        composeTestRule.onNode(hasText("Historial") and hasClickAction()).performClick()
         composeTestRule.onNodeWithText("Mensaje guardado").performScrollTo().performClick()
 
         composeTestRule.onNodeWithText("Mensaje para comunicar").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Eliminar mensaje: Mensaje guardado 1").performScrollTo()
+        composeTestRule.onNode(hasText("Comunicar") and hasClickAction()).assertIsSelected()
+        composeTestRule.onNode(hasText("Historial") and hasClickAction()).performClick()
         composeTestRule.onNodeWithText("Mensaje guardado").performScrollTo().performClick()
         composeTestRule.onNodeWithText("Mensaje para comunicar").assertIsDisplayed()
     }
